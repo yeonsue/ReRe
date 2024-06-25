@@ -8,9 +8,6 @@ from transformers.activations import ACT2FN
 from transformers.modeling_outputs import (BaseModelOutputWithPastAndCrossAttentions,CausalLMOutputWithCrossAttentions,)
 from transformers.modeling_utils import Conv1D
 from typing import Tuple
-#flamingo를 위해 import
-from models.flamingo_pytorch import PerceiverAttention,PerceiverResampler,MaskedCrossAttention,GatedCrossAttentionBlock
-
 
 class GPT2Attention(nn.Module):
     def __init__(self, config, is_cross_attention=False):

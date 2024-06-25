@@ -10,19 +10,19 @@ from PIL import Image
 device = "cuda" 
 model, preprocess = clip.load("ViT-B/32", device)
 
-with open('/data/suhyeon/nlx/nle_data/VQA-X/vqaX_train.json', 'r') as i:
+with open('nle_data/VQA-X/vqaX_train.json', 'r') as i:
     train = json.load(i)
 
-with open('/data/suhyeon/nlx/nle_data/VQA-X/vqaX_test.json', 'r') as i:
+with open('nle_data/VQA-X/vqaX_test.json', 'r') as i:
     test = json.load(i)
 
-with open('/data/suhyeon/nlx/nle_data/VQA-X/vqaX_val.json', 'r') as i:
+with open('nle_data/VQA-X/vqaX_val.json', 'r') as i:
     val = json.load(i)
 
-m_que = np.load('/data/suhyeon/baseline/question_features.npy')
-m_exp = np.load('/data/suhyeon/baseline/exp_features.npy')
-#m_ans = np.load('/data/suhyeon/baseline/answer_features.npy')
-#m_img = np.load('/data/suhyeon/baseline/image_features.npy')
+m_que = np.load('retrieval/question_features.npy')
+m_exp = np.load('retrieval/exp_features.npy')
+#m_ans = np.load('retrieval/answer_features.npy')
+#m_img = np.load('retrieval/image_features.npy')
 
 m_que=torch.tensor(m_que).to(device)
 m_exp=torch.tensor(m_exp).to(device)
@@ -93,7 +93,7 @@ for key in test.keys():
         
     table[key]=keys
 
-with open('/data/suhyeon/baseline/qqii20_test.json', 'w') as json_file:
+with open('retrieval/qqii20_test.json', 'w') as json_file:
     json.dump(table, json_file, indent=4)
 
 print("train!")
@@ -160,5 +160,5 @@ for key in train.keys():
 
     table[key]=keys
 
-with open('/data/suhyeon/baseline/qqii20_train.json', 'w') as json_file:
+with open('retrieval/qqii20_train.json', 'w') as json_file:
     json.dump(table, json_file, indent=4)

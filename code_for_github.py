@@ -47,10 +47,10 @@ def load_checkpoint(ckpt_path, epoch):
     return tokenizer, model, optimizer, scheduler_dic, start_epoch
 
 def load_pretrained():
-    model_path = '/local_datasets/vqax/pretrain_model'
-    tokenizer_path = '/local_datasets/vqax/pretrain_tokenizer_0'
+    # model_path = '/local_datasets/vqax/pretrain_model'
+    # tokenizer_path = '/local_datasets/vqax/pretrain_tokenizer_0'
     tokenizer = GPT2Tokenizer.from_pretrained(tokenizer_path)        # load tokenizer
-    model = GPT2LMHeadModel.from_pretrained(model_path).to(device)   # load model with config
+    model = GPT2LMHeadModel.from_pretrained(pretrain_model_path).to(device)   # load model with config
     return tokenizer, model
     
 
@@ -59,14 +59,11 @@ def save_checkpoint(epoch, unwrapped_model, optimizer, tokenizer, scheduler, ckp
     model_name = 'nle_model_{}'.format(str(epoch))
     tokenizer_name = 'nle_gpt2_tokenizer_{}'.format(str(epoch))
     
-    if epoch == 11:
+    if epoch:
         tokenizer.save_pretrained(ckpt_path + tokenizer_name)   # save tokenizer
         
     unwrapped_model.save_pretrained(ckpt_path + model_name, save_function=accelerator.save)
 
-
-
-#few-shot을 위해서 gpt input_ids등을 만드는 함수 제작
 
 def make_input_text(tokenizer,max_seq_len,question,answer,explanation):
         i_segment_id,r_segment_id,q_segment_id, a_segment_id, e_segment_id = tokenizer.convert_tokens_to_ids([
@@ -107,11 +104,6 @@ def make_input_text(tokenizer,max_seq_len,question,answer,explanation):
         input_ids = tokenizer.convert_tokens_to_ids(tokens)
         input_ids = torch.tensor(input_ids, dtype=torch.long)
 
-        #segement id, labels 를 기존 [32,40]에서 [32,237]로 수정, 197은 이미지 피쳐 수
-        #flamingo에서 아래 삭제
-        #segment_ids = ([i_segment_id]*196)+segment_ids
-        #labels = ([-100] * 196) + labels
-
         segment_ids = torch.tensor(segment_ids, dtype=torch.long)
         labels = [tokenizer.convert_tokens_to_ids(t) if t!=-100 else t for t in labels]
         labels = torch.tensor(labels, dtype=torch.long)
@@ -143,14 +135,14 @@ class VQAXTrainDataset(Dataset):
                 self.ids_list += [str(k)] * (len(v['explanation']) - 1)    
 
         self.index_tracker = {k: len(v['explanation']) - 1 for k,v in self.data.items()}
-        with open('/data/suhyeon/baseline/qqii20_train.json', 'r') as table:
+        with open('retrieval/qqii20_train.json', 'r') as table:
             table = json.load(table)
         self.table = table
 
-        self.exp_features = np.load('/data/suhyeon/baseline/exp_features.npy')
-        self.image_features = np.load('/data/suhyeon/baseline/image_features.npy')
-        self.question_features = np.load('/data/suhyeon/baseline/question_features.npy')
-        self.ans_features = np.load('/data/suhyeon/baseline/answer_features.npy')
+        self.exp_features = np.load('retrieval/exp_features.npy')
+        self.image_features = np.load('retrieval/image_features.npy')
+        self.question_features = np.load('retrieval/question_features.npy')
+        self.ans_features = np.load('retrieval/answer_features.npy')
         
 
     def __getitem__(self, i):
@@ -168,16 +160,14 @@ class VQAXTrainDataset(Dataset):
         text_b = sample['explanation'][exp_idx]   # explanation
 
         # tokenization process
-        ##먼저 쿼리 input을 만듬, [32,40]을 [1,32,40]으로 resize
         input_ids, labels, segment_ids = make_input_text(self.tokenizer,self.max_seq_len,query_question,answer,text_b)
-        ##이미지 임베딩, 나중에 few-shot의 경우 for구문으로 변경.
+
         folder = '/local_datasets/vqax/train2014/' if 'train' in img_name else '/local_datasets/vqax/val2014/'
         img_path = folder + img_name
         img = Image.open(img_path).convert('RGB')
         img = self.transform(img)
 
-        #retrieve적용!
-        #keys=retrieval(img,query_question,'train')
+        # adapt retrieval
         keys=self.table[quention_id]
         train_key=list(self.data)
 
@@ -211,17 +201,17 @@ class VQAXEvalDataset(Dataset):
         self.max_seq_len = max_seq_len       # question + <bos> The answer is <answer> becase <explanation> <eos>
         self.data = json.load(open(path, 'r'))
         self.ids_list = list(self.data.keys())
-        with open('/data/suhyeon/baseline/qqii20_test.json', 'r') as table:
+        with open('retrieval/qqii20_test.json', 'r') as table:
             table = json.load(table)
         self.table = table
-        with open('/data/suhyeon/baseline/nle_data/VQA-X/vqaX_train.json', 'r') as train:
+        with open('nle_data/VQA-X/vqaX_train.json', 'r') as train:
             train = json.load(train)
         self.train = train
 
-        self.exp_features = np.load('/data/suhyeon/baseline/exp_features.npy')
-        self.image_features = np.load('/data/suhyeon/baseline/image_features.npy')
-        self.question_features = np.load('/data/suhyeon/baseline/question_features.npy')
-        self.ans_features = np.load('/data/suhyeon/baseline/answer_features.npy')
+        self.exp_features = np.load('retrieval/exp_features.npy')
+        self.image_features = np.load('retrieval/image_features.npy')
+        self.question_features = np.load('retrieval/question_features.npy')
+        self.ans_features = np.load('retrieval/answer_features.npy')
 
 
     def __getitem__(self, i):
@@ -248,14 +238,12 @@ class VQAXEvalDataset(Dataset):
         input_ids = torch.tensor(input_ids, dtype=torch.long).unsqueeze(0)
         segment_ids = torch.tensor(segment_ids, dtype=torch.long).unsqueeze(0)
 
-        ##이미지 임베딩, 나중에 few-shot의 경우 for구문으로 변경.
         folder = '/local_datasets/vqax/train2014/' if 'train' in img_name else '/local_datasets/vqax/val2014/'
         img_path = folder + img_name
         img = Image.open(img_path).convert('RGB')
         img = self.transform(img)
 
-        #retrieve적용!
-        #keys=retrieval(img,query_question,'train')
+        # adapt retrieval
         keys=self.table[quention_id]
         train_key=list(self.train)
 
@@ -380,6 +368,8 @@ caption_save_path = 'results/qqii/'
 nle_data_train_path = 'nle_data/VQA-X/vqaX_train.json'
 nle_data_test_path = 'nle_data/VQA-X/vqaX_test.json'
 nle_data_val_path = 'nle_data/VQA-X/vqaX_val.json'
+pretrain_model_path = '/local_datasets/vqax/pretrain_model'
+tokenizer_path = '/local_datasets/vqax/pretrain_tokenizer_0'
 max_seq_len = 40
 load_from_epoch = None
 no_sample = True   
@@ -428,16 +418,6 @@ else:
         model.resize_token_embeddings(len(tokenizer))
         model = model.to(device)
 
-
-        # ## model에서 파라미터 freeze
-        # for name, param in model.named_parameters():
-        #     # if name.split('.')[1] == "h":
-        #     #     if name.split('.')[3] == "gated_cross_attn":
-        #     #         param.requires_grad = True
-        #     #     else:
-        #     #         param.requires_grad = False
-        #     print(name, param.requires_grad)
-        
         optimizer = get_optimizer(model, learning_rate)
 
 print("Model Setup Ready...")
@@ -454,7 +434,7 @@ train_dataset = VQAXTrainDataset(path = nle_data_train_path,
 
 train_loader = torch.utils.data.DataLoader(train_dataset,
                                            batch_size = batch_size, 
-                                           shuffle=True,  ####### True로 꼭 바꾸기!!
+                                           shuffle=True,
                                            pin_memory=True)
 
 test_dataset = VQAXEvalDataset(path = nle_data_test_path,      
@@ -519,9 +499,9 @@ for epoch in range(start_epoch, num_train_epochs):
             accum_loss = 0
 
     unwrapped_model = accelerator.unwrap_model(model)
-    save_checkpoint(11, unwrapped_model, optimizer, tokenizer, scheduler, ckpt_path)
+    save_checkpoint(epoch, unwrapped_model, optimizer, tokenizer, scheduler, ckpt_path)
     print('model save on epoch ',epoch)
-    if epoch>4:
+    if epoch:
         results_full, results_exp = sample_sequences(model, tokenizer, test_loader)
 
         resFileExp = caption_save_path + 'captions_exp_' + str(epoch) + '.json'
