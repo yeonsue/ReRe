@@ -2,6 +2,7 @@
 Official Code for **ReRe:Retrieval-Augmented Natural Language Reasoning For Explainable Visual Question Answering** <br>
 <br>
 Accepted from **IEEE ICIP 2024 workshop: Integrating Image Processing with Large-Scale Language/Vision Models for Advanced Visual Understanding**
+Paper: [https://arxiv.org/abs/2408.17006](https://arxiv.org/abs/2408.17006)
 
 <br>
 <p align="center">
